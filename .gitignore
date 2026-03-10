@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Environments
+.env
+.env.local
+.venv
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Next.js
+.next/
+out/
+node_modules/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+lexai/backend/venv/
+lexai/frontend/node_modules/
+lexai/frontend/.next/
+lexai/backend/__pycache__/
+lexai/backend/lexai_budget.json
+lexai_gemini_budget.json
+lexai_budget.json
+debug_env.py
