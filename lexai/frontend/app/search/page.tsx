@@ -3,10 +3,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { search, getFacets } from '@/lib/api';
-import type { CaseRecord, FacetsResponse } from '@/lib/types';
+import { search, getFacets, ragQuery, voiceRagQuery } from '@/lib/api';
+import type { CaseRecord, FacetsResponse, RagResponse, VoiceRagResponse } from '@/lib/types';
 import SearchBar from '@/components/SearchBar';
 import CaseCard from '@/components/CaseCard';
+import RagResults from '@/components/RagResults';
+import VoiceRecorder from '@/components/VoiceRecorder';
 
 export default function SearchPage() {
   const searchParams = useSearchParams();
@@ -19,6 +21,11 @@ export default function SearchPage() {
   const [error, setError] = useState<string | null>(null);
   const [facets, setFacets] = useState<FacetsResponse>({ outcomes: [], judgmentTypes: [] });
   const [selectedOutcome, setSelectedOutcome] = useState<string | null>(null);
+
+  // RAG States
+  const [ragData, setRagData] = useState<RagResponse | VoiceRagResponse | null>(null);
+  const [ragLoading, setRagLoading] = useState(false);
+  const [showRecorder, setShowRecorder] = useState(false);
 
   useEffect(() => {
     getFacets().then(setFacets).catch(() => {});
@@ -42,10 +49,42 @@ export default function SearchPage() {
     if (initialQuery) doSearch(initialQuery, selectedOutcome);
   }, []);
 
-  const handleSearch = (q: string) => {
+  const handleSearch = async (q: string) => {
     setQuery(q);
     router.replace(`/search?q=${encodeURIComponent(q)}`, { scroll: false });
+    
+    // Perform standard search
     doSearch(q, selectedOutcome);
+
+    // Perform RAG query
+    setRagLoading(true);
+    setRagData(null);
+    try {
+      const res = await ragQuery(q);
+      setRagData(res);
+    } catch (e) {
+      console.error('RAG query failed:', e);
+    } finally {
+      setRagLoading(false);
+    }
+  };
+
+  const handleVoiceRecording = async (blob: Blob) => {
+    setShowRecorder(false);
+    setRagLoading(true);
+    setRagData(null);
+    setError(null);
+    try {
+      const res = await voiceRagQuery(blob);
+      setRagData(res);
+      setQuery(res.transcribed_query);
+      router.replace(`/search?q=${encodeURIComponent(res.transcribed_query)}`, { scroll: false });
+      doSearch(res.transcribed_query, selectedOutcome);
+    } catch (e: any) {
+      setError(e.message || 'Voice RAG failed');
+    } finally {
+      setRagLoading(false);
+    }
   };
 
   const handleOutcome = (o: string) => {
@@ -74,8 +113,28 @@ export default function SearchPage() {
 
       {/* Search bar */}
       <div className="mb-10">
-        <SearchBar defaultValue={query} onSearch={handleSearch} />
+        <SearchBar 
+          defaultValue={query} 
+          onSearch={handleSearch} 
+          onVoiceRecord={() => setShowRecorder(true)} 
+        />
       </div>
+
+      <AnimatePresence>
+        {showRecorder && (
+          <VoiceRecorder 
+            onRecordingComplete={handleVoiceRecording} 
+            onClose={() => setShowRecorder(false)} 
+          />
+        )}
+      </AnimatePresence>
+
+      {/* RAG Results Panel */}
+      <RagResults 
+        data={ragData} 
+        loading={ragLoading} 
+        onClose={() => setRagData(null)} 
+      />
 
       <div className="grid lg:grid-cols-[220px_1fr] gap-8">
         {/* Left: Filters */}

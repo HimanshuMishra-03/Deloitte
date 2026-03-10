@@ -14,9 +14,10 @@ const EXAMPLE_QUERIES = [
 interface SearchBarProps {
   defaultValue?: string;
   onSearch?: (query: string) => void;
+  onVoiceRecord?: () => void;
 }
 
-export default function SearchBar({ defaultValue = '', onSearch }: SearchBarProps) {
+export default function SearchBar({ defaultValue = '', onSearch, onVoiceRecord }: SearchBarProps) {
   const [value, setValue] = useState(defaultValue);
   const router = useRouter();
 
@@ -45,14 +46,27 @@ export default function SearchBar({ defaultValue = '', onSearch }: SearchBarProp
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSubmit(value)}
           placeholder="Search Indian judgments by issue, section, precedent…"
-          className="w-full bg-white/[0.04] border border-white/10 rounded-2xl pl-12 pr-16 py-4 text-parchment placeholder-ink-100/30 font-sans text-base focus:outline-none focus:border-gold/50 focus:bg-white/[0.06] transition-all"
+          className="w-full bg-white/[0.04] border border-white/10 rounded-2xl pl-12 pr-32 py-4 text-parchment placeholder-ink-100/30 font-sans text-base focus:outline-none focus:border-gold/50 focus:bg-white/[0.06] transition-all"
         />
-        <button
-          onClick={() => handleSubmit(value)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 bg-gold hover:bg-gold-light text-ink-900 font-mono text-sm font-bold px-4 py-2 rounded-xl transition-colors"
-        >
-          Search
-        </button>
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+          {onVoiceRecord && (
+            <button
+              onClick={onVoiceRecord}
+              title="Voice Search"
+              className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gold transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-20a3 3 0 00-3 3v8a3 3 0 006 0V5a3 3 0 00-3-3z" />
+              </svg>
+            </button>
+          )}
+          <button
+            onClick={() => handleSubmit(value)}
+            className="bg-gold hover:bg-gold-light text-ink-900 font-mono text-sm font-bold px-4 py-2 rounded-xl transition-colors"
+          >
+            Search
+          </button>
+        </div>
       </div>
 
       {/* Example chips */}
