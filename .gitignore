@@ -47,6 +47,8 @@ node_modules/
 Thumbs.db
 
 # Project specific
+lexai/backend/.env
+lexai/frontend/.env.local
 lexai/backend/venv/
 lexai/frontend/node_modules/
 lexai/frontend/.next/
