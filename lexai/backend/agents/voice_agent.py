@@ -107,10 +107,10 @@ async def synthesize(text: str, voice: str = "default") -> bytes:
 
     tts    = _get_tts()
     chunks = []
-    for audio_bytes_chunk in tts.synthesize_stream_raw(text):
-        chunks.append(
-            np.frombuffer(audio_bytes_chunk, dtype=np.int16)
-        )
+    # Use simple synthesize and accumulate binary audio data
+    for chunk in tts.synthesize(text):
+        # chunk.audio_int16_bytes is the raw PCM bytes
+        chunks.append(np.frombuffer(chunk.audio_int16_bytes, dtype=np.int16))
 
     if not chunks:
         return b""
