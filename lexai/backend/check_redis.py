@@ -10,6 +10,6 @@ print(f"Connecting to: {redis_url}")
 try:
     r = redis.from_url(redis_url)
     r.ping()
-    print("✅ Redis connection successful!")
+    print("Redis connection successful!")
 except Exception as e:
-    print(f"❌ Redis connection failed: {e}")
+    print(f" Redis connection failed: {e}")

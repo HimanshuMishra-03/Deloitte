@@ -1,0 +1,175 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ── CSS Variables ────────────────────────────────────────────────── */
+:root {
+  --bg:           #F0F4FF;
+  --bg-2:         #E8EEF8;
+  --surface:      #FFFFFF;
+  --surface-2:    #F8FAFF;
+  --border:       rgba(0,0,0,0.07);
+  --primary:      #2563EB;
+  --primary-glow: rgba(37,99,235,0.15);
+  --accent:       #059669;
+  --accent-glow:  rgba(5,150,105,0.15);
+  --warning:      #D97706;
+  --danger:       #DC2626;
+  --text-1:       #0F172A;
+  --text-2:       #475569;
+  --text-3:       #94A3B8;
+  --sidebar-w:    260px;
+  --navbar-h:     64px;
+  --radius:       14px;
+  --radius-sm:    8px;
+  --shadow:       0 1px 3px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.06);
+  --shadow-lg:    0 4px 6px rgba(0,0,0,0.07), 0 20px 40px rgba(0,0,0,0.1);
+  --transition:   all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="dark"] {
+  --bg:           #0A0F1E;
+  --bg-2:         #0D1426;
+  --surface:      #111827;
+  --surface-2:    #1a2236;
+  --border:       rgba(255,255,255,0.06);
+  --primary:      #3B7FF5;
+  --primary-glow: rgba(59,127,245,0.20);
+  --accent:       #00D4AA;
+  --accent-glow:  rgba(0,212,170,0.15);
+  --warning:      #F59E0B;
+  --danger:       #EF4444;
+  --text-1:       #F1F5F9;
+  --text-2:       #94A3B8;
+  --text-3:       #475569;
+  --shadow:       0 1px 3px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.4);
+  --shadow-lg:    0 4px 6px rgba(0,0,0,0.4), 0 20px 40px rgba(0,0,0,0.6);
+}
+
+/* ── Reset + Base ─────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text-1);
+  transition: background 0.3s ease, color 0.3s ease;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Animations ───────────────────────────────────────────────────── */
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 var(--primary-glow); }
+  50%       { box-shadow: 0 0 0 8px transparent; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-6px); }
+}
+
+.page-enter {
+  animation: pageIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* ── Skeleton loading ─────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface) 25%,
+    var(--surface-2) 50%,
+    var(--surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+/* ── Glass card ───────────────────────────────────────────────────── */
+.glass {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+}
+
+/* ── Hover interactions ───────────────────────────────────────────── */
+.glass:hover {
+  border-color: rgba(59,127,245,0.2);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ── Confidence color scale ───────────────────────────────────────── */
+.conf-high   { color: var(--accent); }
+.conf-medium { color: var(--warning); }
+.conf-low    { color: var(--danger); }
+
+/* ── Nav hover state ──────────────────────────────────────────────── */
+.nav-item:hover {
+  background: var(--primary-glow) !important;
+  color: var(--primary) !important;
+}
+
+.nav-item-section:hover {
+  background: var(--accent-glow) !important;
+  color: var(--accent) !important;
+}
+
+/* ── Result card hover ────────────────────────────────────────────── */
+.result-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(59,127,245,0.25) !important;
+}
+
+/* ── Btn hover ────────────────────────────────────────────────────── */
+.btn-icon:hover {
+  background: var(--surface-2) !important;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}

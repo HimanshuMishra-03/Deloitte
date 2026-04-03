@@ -1,50 +1,17 @@
 """
-agents/rag_agent.py -- Offline RAG agent for LexAI.
-
-Uses Qdrant semantic search + local Phi-3-mini LLM for grounded answers.
-Configure via .env:
-  RAG_LLM_MODEL=microsoft/Phi-3-mini-4k-instruct
-  TRANSFORMERS_OFFLINE=1
+agents/rag_agent.py -- Robust RAG agent for LexAI.
+Uses Qdrant for cross-case search and llama-cpp (via chatbot_agent) for generation.
 """
 from __future__ import annotations
-import asyncio, logging, os, time
+import asyncio
+import logging
+import time
 from dataclasses import dataclass
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
-from services.qdrant_service import semantic_search as _qdrant_search
+from agents.chatbot_agent import get_llm, retrieve_top_k  # type: ignore
+from services.qdrant_service import semantic_search as _qdrant_search, generate_embedding  # type: ignore
+from services.neon import get_case_by_id  # type: ignore
 
-logger    = logging.getLogger(__name__)
-LLM_MODEL = os.getenv("RAG_LLM_MODEL", "microsoft/Phi-3-mini-4k-instruct")
-_llm      = None
-_llm_lock = asyncio.Lock()
-
-# Phi-3 prompt template tokens
-_SYS_START = "<|system|>"
-_END       = "<|end|>"
-_USR_START = "<|user|>"
-_AST_START = "<|assistant|>"
-
-
-async def _get_llm():
-    global _llm
-    async with _llm_lock:
-        if _llm is None:
-            logger.info("Loading LLM %s (first call ~30s on CPU)...", LLM_MODEL)
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            tok    = AutoTokenizer.from_pretrained(LLM_MODEL)
-            model  = AutoModelForCausalLM.from_pretrained(
-                LLM_MODEL,
-                torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-                low_cpu_mem_usage=True,
-            )
-            _llm = pipeline(
-                "text-generation", model=model, tokenizer=tok,
-                max_new_tokens=512, temperature=0.1,
-                do_sample=True, repetition_penalty=1.1,
-            )
-            logger.info("LLM loaded on %s", device)
-    return _llm
-
+logger = logging.getLogger(__name__)
 
 @dataclass
 class RAGResult:
@@ -53,61 +20,83 @@ class RAGResult:
     query: str
     latency_ms: int
 
-
 async def answer(
     query: str,
     case_id: str | None = None,
     top_k: int = 5,
 ) -> RAGResult:
     """
-    Retrieve chunks from Qdrant, build a grounded prompt, generate an answer.
-
-    Args:
-        query:   Natural-language legal question.
-        case_id: If provided, restrict search to a single case.
-        top_k:   Number of chunks to retrieve.
+    Retrieve relevant chunks (local or global), build prompt, and generate answer.
     """
     start = time.time()
-    hits  = await _qdrant_search(query=query, limit=top_k, case_id=case_id)
+    hits = []
+
+    if case_id:
+        # 1. Single-case RAG (Fast local search)
+        logger.info("RAG | case-specific | case=%s", case_id)
+        hits = await retrieve_top_k(query, case_id)
+    else:
+        # 2. Global RAG (Cross-case search)
+        logger.info("RAG | global search | query='%s'", query[0:50])  # type: ignore
+        try:
+            # Embed the query string first (Required by qdrant_service)
+            query_vector = await generate_embedding(query)
+            # Find top relevant cases
+            search_results = await _qdrant_search(query_vector=query_vector, top_k=3)
+            
+            # For each case, fetch top internal chunks
+            for res in search_results:
+                cid = res["caseId"]
+                case_hits = await retrieve_top_k(query, cid)
+                # Take top 2 chunks from each relevant case
+                hits.extend(case_hits[0:2])  # type: ignore
+            
+            # Sort all retrieved chunks by score
+            hits.sort(key=lambda x: x.get("score", 0), reverse=True)
+            hits = hits[0:top_k]  # type: ignore
+        except Exception as e:
+            logger.error("Global RAG failed: %s", e)
+            return RAGResult("Error performing global search.", [], query, int((time.time()-start)*1000))
 
     if not hits:
         return RAGResult(
-            answer="No relevant information found in indexed judgments.",
-            sources=[], query=query,
-            latency_ms=int((time.time() - start) * 1000),
+            "No relevant information found in the judgments.",
+            [], query, int((time.time() - start) * 1000)
         )
 
-    context = "\n\n---\n\n".join(
-        "[Source {i}: {title} | {sec}]\n{text}".format(
-            i=i+1,
-            title=h.get("case_title") or h["case_id"],
-            sec=h["section_hint"].upper(),
-            text=h["text"],
-        )
+    # 3. Build Prompt (ChatML format for Qwen2.5)
+    context = "\n\n".join(
+        f"[Source {i+1}]: {h['section'].upper()}\n{h['excerpt']}"
         for i, h in enumerate(hits)
     )
-
+    
     prompt = (
-        _SYS_START + "\n"
-        "You are a precise Indian legal assistant. "
-        "Answer ONLY from the provided excerpts. Cite [Source N]. "
-        "If not found in excerpts, say so clearly."
-        + _END + "\n"
-        + _USR_START + f"\nQuestion: {query}\n\nExcerpts:\n{context}"
-        + _END + "\n"
-        + _AST_START + "\n"
+        "<|im_start|>system\nYou are LexAI, a precise Indian legal assistant. "
+        "Answer the question using ONLY the provided excerpts. Cite [Source N].<|im_end|>\n"
+        f"<|im_start|>user\nContext:\n{context}\n\nQuestion: {query}<|im_end|>\n"
+        "<|im_start|>assistant\n"
     )
 
-    llm    = await _get_llm()
-    output = await asyncio.to_thread(llm, prompt, return_full_text=False)
-    text   = output[0]["generated_text"].strip()
-
-    # Strip any trailing template tokens from generated text
-    for sentinel in (_SYS_START, _END, _USR_START, _AST_START):
-        if sentinel in text:
-            text = text[:text.index(sentinel)].strip()
+    # 4. Generate using the faster Llama-cpp model
+    try:
+        llm = await get_llm()
+        # Non-streaming call for sync API
+        response = await asyncio.to_thread(
+            llm,
+            prompt,
+            max_tokens=512,
+            temperature=0.1,
+            stop=["<|im_end|>", "<|im_start|>"],
+        )
+        answer_text = response["choices"][0]["text"].strip()  # type: ignore
+    except Exception as e:
+        logger.error("LLM Generation failed: %s", e)
+        answer_text = "Error generating answer from retrieved context."
 
     return RAGResult(
-        answer=text, sources=hits, query=query,
+        answer=answer_text,
+        sources=list(hits),  # type: ignore
+        query=query,
         latency_ms=int((time.time() - start) * 1000),
     )
+

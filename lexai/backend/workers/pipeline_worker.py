@@ -13,6 +13,7 @@ from celery_app import celery_app
 from agents.orchestrator import run_pipeline
 from services.file_parser import parse_file
 from services.gemini import BudgetExhaustedError
+from services import neon
 
 logger = get_task_logger(__name__)
 
@@ -37,6 +38,10 @@ def _run_async(coro):
                     asyncio.gather(*pending, return_exceptions=True)
                 )
         finally:
+            try:
+                loop.run_until_complete(neon.close_pool())
+            except Exception:
+                pass
             loop.close()
             asyncio.set_event_loop(None)
 

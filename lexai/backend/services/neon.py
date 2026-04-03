@@ -4,6 +4,7 @@ Single source of truth for all structured case data.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -15,15 +16,45 @@ import asyncpg
 
 logger = logging.getLogger(__name__)
 
-_pool: asyncpg.Pool | None = None
+_pools: dict[int, asyncpg.Pool] = {}
 
 
 async def get_pool() -> asyncpg.Pool:
-    global _pool
-    if _pool is None:
+    """
+    Returns a loop-aware asyncpg pool.
+    Celery workers create fresh event loops per task; sharing a global pool
+    across loops causes InterfaceError/RuntimeError.
+    """
+    global _pools
+    loop = asyncio.get_running_loop()
+    loop_id = id(loop)
+
+    if loop_id not in _pools or _pools[loop_id].is_closing():
         dsn = os.environ["DATABASE_URL"]
-        _pool = await asyncpg.create_pool(dsn, min_size=1, max_size=10, command_timeout=60)
-    return _pool
+        # Use a smaller pool per loop to avoid hitting Neon connection limits
+        _pools[loop_id] = await asyncpg.create_pool(
+            dsn, 
+            min_size=1, 
+            max_size=5, 
+            command_timeout=60
+        )
+        logger.debug("Created new asyncpg pool for loop %d", loop_id)
+    
+    return _pools[loop_id]
+
+
+async def close_pool() -> None:
+    """Closes the pool associated with the current running event loop."""
+    global _pools
+    try:
+        loop = asyncio.get_running_loop()
+        loop_id = id(loop)
+        if loop_id in _pools:
+            pool = _pools.pop(loop_id)
+            await pool.close()
+            logger.debug("Closed asyncpg pool for loop %d", loop_id)
+    except RuntimeError:
+        pass  # No running loop
 
 
 # ── TYPE HELPERS ──────────────────────────────────────────────────────────────

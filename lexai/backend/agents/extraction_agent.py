@@ -17,26 +17,37 @@ logger = logging.getLogger(__name__)
 MAX_SINGLE_CALL_CHARS = 2_800_000
 
 EXTRACTION_PROMPT_TEMPLATE = """\
-Extract the following structured fields from the Indian legal judgment text provided below.
+You are a senior Indian legal analyst. Extract the following structured fields from the judgment below with MAXIMUM accuracy.
 
 SCHEMA:
 {{
-  "caseTitle": "string",
-  "courtAndDate": "string",
-  "mainIssue": "string (2-3 sentences describing the main legal question)",
-  "petitionerArguments": ["string — one discrete argument point per item"],
-  "respondentArguments": ["string — one discrete argument point per item"],
-  "sectionsOfLaw": ["string — format: 'Act § Number — short description'"],
-  "precedentsCited": ["string — format: 'Party v Party (Year) Volume Reporter Page'"],
-  "courtReasoning": "string (4-6 sentences on how the court reasoned)",
-  "finalDecision": "string",
-  "outcome": "one of: acquitted | convicted | remanded | modified | dismissed"
+  "caseTitle": "string — Full case name as it appears in the header (e.g., 'X vs Y')",
+  "courtAndDate": "string — Court name and date of judgment (e.g., 'Supreme Court of India, January 15, 2024')",
+  "mainIssue": "string — The central legal question or dispute in 3-5 clear sentences. Be comprehensive.",
+  "petitionerArguments": ["string — One distinct argument per entry. Extract ALL arguments raised by the petitioner/appellant. Aim for 3-8 items."],
+  "respondentArguments": ["string — One distinct argument per entry. Extract ALL arguments by the respondent. Aim for 3-8 items."],
+  "sectionsOfLaw": ["string — Format: 'Act Name, Section Number — brief description'. Include ALL statutes cited."],
+  "precedentsCited": ["string — Format: 'Party v Party (Year) Volume Reporter Page'. Include ALL cases cited."],
+  "courtReasoning": "string — Detailed analysis of how the court reasoned, key legal principles applied, and why. 5-8 sentences minimum.",
+  "finalDecision": "string — The operative part of the order. What did the court actually order?",
+  "outcome": "one of: allowed | dismissed | partly allowed | acquitted | convicted | remanded | modified | set aside | upheld | disposed of | quashed | stayed | withdrawn | other"
 }}
 
-Rules:
-- Return null / empty string / empty array for absent fields.
-- 'outcome' MUST be exactly one of: acquitted, convicted, remanded, modified, dismissed.
-- Extract only what is explicitly written. No hallucinations.
+CRITICAL RULES:
+1. Extract VERBATIM from the judgment text. Do not paraphrase or hallucinate.
+2. 'outcome' MUST be exactly one of the listed values. Map the court's decision to the closest match:
+   - "appeal allowed" → "allowed"
+   - "appeal dismissed" → "dismissed"  
+   - "petition partly allowed" → "partly allowed"
+   - "conviction upheld" → "convicted"
+   - "acquittal confirmed" → "acquitted"
+   - "matter remanded" → "remanded"
+   - "order set aside" → "set aside"
+   - "disposed of" → "disposed of"
+3. For petitionerArguments and respondentArguments: Extract EVERY distinct legal argument. Do NOT combine multiple arguments into one.
+4. For sectionsOfLaw: Include every statute, section, article, and rule mentioned.
+5. For precedentsCited: Include every case name referenced, even briefly.
+6. If a field genuinely has no data, use "" for strings or [] for arrays. Never omit fields.
 
 JUDGMENT TEXT:
 {judgment_text}

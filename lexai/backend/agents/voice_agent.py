@@ -9,10 +9,26 @@ Configure via .env:
   WHISPER_MODEL=small
 """
 from __future__ import annotations
-import asyncio, io, logging, os, tempfile
+import asyncio
+import io
+import logging
+import os
+import tempfile
 from pathlib import Path
 
 logger         = logging.getLogger(__name__)
+
+# Add FFmpeg to PATH for Whisper/librosa
+FFMPEG_BIN_DIR = r"C:\Users\Himanshu Mishra\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.0.1-full_build\bin"
+
+if os.path.exists(FFMPEG_BIN_DIR):
+    # Prepend to ensure our specific Gyan FFmpeg is used over any system defaults
+    if FFMPEG_BIN_DIR not in os.environ.get("PATH", ""):
+        os.environ["PATH"] = FFMPEG_BIN_DIR + os.pathsep + os.environ.get("PATH", "")
+else:
+    logger.warning("FFmpeg bin dir not found: %s", FFMPEG_BIN_DIR)
+
+
 _WHISPER_SIZE  = os.getenv("WHISPER_MODEL", "small")
 _whisper_model = None
 _piper_voice   = None
@@ -21,7 +37,7 @@ _piper_voice   = None
 def _get_whisper():
     global _whisper_model
     if _whisper_model is None:
-        import whisper
+        import whisper  # type: ignore
         logger.info("Loading Whisper %s...", _WHISPER_SIZE)
         _whisper_model = whisper.load_model(_WHISPER_SIZE)
     return _whisper_model
@@ -35,7 +51,7 @@ def _get_tts():
     global _piper_voice
     if _piper_voice is None:
         import urllib.request
-        from piper.voice import PiperVoice
+        from piper.voice import PiperVoice  # type: ignore
 
         model_dir  = Path(os.path.expanduser("~/.cache/piper"))
         model_dir.mkdir(parents=True, exist_ok=True)
@@ -73,16 +89,24 @@ async def transcribe(audio_bytes: bytes, fmt: str = "webm") -> str:
     Returns:
         Transcribed text string.
     """
-    import torch
+    import torch  # type: ignore
     with tempfile.NamedTemporaryFile(suffix=f".{fmt}", delete=False) as tmp:
         tmp.write(audio_bytes)
         path = tmp.name
     try:
         model  = _get_whisper()
+        # Ensure fp16 is truly supported if requested; fallback to False for safety
+        use_fp16 = False
+        try:
+            if torch.cuda.is_available():
+                use_fp16 = True
+        except Exception:
+            pass
+        
         result = await asyncio.to_thread(
             model.transcribe, path,
-            language="en", fp16=torch.cuda.is_available(),
-        )
+            language="en", fp16=use_fp16,
+        )  # type: ignore
         return result["text"].strip()
     finally:
         Path(path).unlink(missing_ok=True)
@@ -98,8 +122,8 @@ async def synthesize(text: str, voice: str = "default") -> bytes:
     Returns:
         WAV audio bytes (16-bit PCM, 22050 Hz, mono).
     """
-    import numpy as np
-    import soundfile as sf
+    import numpy as np  # type: ignore
+    import soundfile as sf  # type: ignore
 
     words = text.split()
     if len(words) > 300:

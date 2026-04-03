@@ -24,8 +24,8 @@ PUBLISH_THRESHOLD    = 0.75
 # Validation doesn't need the full 50k-char document.
 # Head covers: parties, issues, arguments.
 # Tail covers: court reasoning, decision, outcome.
-_HEAD_CHARS = 8_000
-_TAIL_CHARS = 4_000
+_HEAD_CHARS = 12_000
+_TAIL_CHARS = 8_000
 
 
 def _build_source_window(raw_text: str) -> str:

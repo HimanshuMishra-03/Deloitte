@@ -57,3 +57,18 @@ lexai/backend/lexai_budget.json
 lexai_gemini_budget.json
 lexai_budget.json
 debug_env.py
+
+# Models and Large Files
+*.gguf
+*.bin
+*.pt
+*.pth
+*.onnx
+
+# Logs
+*.log
+*log*.txt
+
+# Build and cache
+*.tsbuildinfo
+.eslintcache

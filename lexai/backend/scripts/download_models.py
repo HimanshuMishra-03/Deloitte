@@ -21,9 +21,17 @@ import whisper
 whisper.load_model("small")
 print("     Done.")
 
-print("4/4  Downloading Kokoro TTS (~330 MB)...")
-from kokoro import KPipeline
-KPipeline(lang_code="a")
+print("4/4  Downloading Piper TTS model (~67 MB)...")
+import urllib.request
+from pathlib import Path
+model_dir = Path(os.path.expanduser("~/.cache/piper"))
+model_dir.mkdir(parents=True, exist_ok=True)
+base = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/"
+for f in ["en_US-lessac-medium.onnx", "en_US-lessac-medium.onnx.json"]:
+    target = model_dir / f
+    if not target.exists():
+        print(f"     Downloading {f}...")
+        urllib.request.urlretrieve(base + f, target)
 print("     Done.")
 
 print()
